@@ -1,58 +1,65 @@
 trigger:
   branches:
     include:
-      - master
+      - main
+
+pool:
+  name: 'Self-Hosted-Agent'  # Aapka self-hosted agent jo VM me install hai
 
 stages:
-  - stage: DeployTest
-    displayName: 'Deploy to Test Environment'
-    jobs:
-      - job: Deploy
-        steps:
-          - task: CopyFilesOverSSH@0
-            displayName: 'Deploy to Test'
+- stage: Test
+  displayName: 'Deploy to Test'
+  jobs:
+  - job: DeployTest
+    steps:
+    - script: |
+        dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/Test
+      displayName: 'Build & Publish Test'
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.ArtifactStagingDirectory)/Test'
+        TargetFolder: 'C:\inetpub\wwwroot\Test'
+      displayName: 'Copy to Test Environment'
+
+- stage: Stage
+  displayName: 'Deploy to Stage'
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - deployment: DeployStage
+    environment: 'Stage'  # Manual approval required
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: |
+              dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/Stage
+            displayName: 'Build & Publish Stage'
+
+          - task: CopyFiles@2
             inputs:
-              sshEndpoint: 'MySingleVM'
-              sourceFolder: '$(Build.ArtifactStagingDirectory)'
-              targetFolder: '/var/www/test'
-              overwrite: true
+              SourceFolder: '$(Build.ArtifactStagingDirectory)/Stage'
+              TargetFolder: 'C:\inetpub\wwwroot\Stage'
+            displayName: 'Copy to Stage Environment'
 
-  - stage: DeployStage
-    displayName: 'Deploy to Stage Environment'
-    dependsOn: DeployTest
-    condition: succeeded()
-    jobs:
-      - deployment: StageApproval
-        displayName: 'Wait for Stage Approval'
-        environment: 'Stage'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: CopyFilesOverSSH@0
-                  displayName: 'Deploy to Stage'
-                  inputs:
-                    sshEndpoint: 'MySingleVM'
-                    sourceFolder: '$(Build.ArtifactStagingDirectory)'
-                    targetFolder: '/var/www/stage'
-                    overwrite: true
+- stage: Prod
+  displayName: 'Deploy to Production'
+  dependsOn: Stage
+  condition: succeeded()
+  jobs:
+  - deployment: DeployProd
+    environment: 'Prod'  # Manual approval required
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: |
+              dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/Prod
+            displayName: 'Build & Publish Prod'
 
-  - stage: DeployProd
-    displayName: 'Deploy to Prod Environment'
-    dependsOn: DeployStage
-    condition: succeeded()
-    jobs:
-      - deployment: ProdApproval
-        displayName: 'Wait for Prod Approval'
-        environment: 'Production'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: CopyFilesOverSSH@0
-                  displayName: 'Deploy to Prod'
-                  inputs:
-                    sshEndpoint: 'MySingleVM'
-                    sourceFolder: '$(Build.ArtifactStagingDirectory)'
-                    targetFolder: '/var/www/prod'
-                    overwrite: true
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: '$(Build.ArtifactStagingDirectory)/Prod'
+              TargetFolder: 'C:\inetpub\wwwroot\Prod'
+            displayName: 'Copy to Production Environment'
