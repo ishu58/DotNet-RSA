@@ -1,68 +1,99 @@
+
 trigger:
-  branches:
-    include:
-      - master
-
-pool:
-  name: 'Azure Pipelines'  # Aapke self-hosted agent ka correct pool name
-
+  - main
 stages:
-- stage: Test
-  displayName: 'Deploy to Test'
-  jobs:
-  - job: DeployTest
+ - stage: "Build"
+    jobs:
+      - job: "BuildJob"
+      pool:
+      vmImage: 'windows-latest'
+      
+      variables:
+      buildConfiguration: 'Release'
+      steps:
+
+        - task: DotNetCoreCLI@2
+        displayName: "Restore Project"
+        inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+
+        - task: DotNetCoreCLI@2
+        displayName : "Build Project"
+        inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '-c $(buildConfiguration)'
+
+        - task: DotNetCoreCLI@2
+        displayName : "Build Project"
+        inputs:
+        command: 'publish'
+        publishWebProjects: true
+        arguments: '-c $(buildConfiguration) -o $(build.artifactstagingdirectory)'
+        
+        - task: PublishBuildArtifacts@1
+        displayName: 'Publish Artifact'
+        inputs:PathtoPublish: '$(build.artifactstagingdirectory)'
+
+ - stage: "DeployToDev"
+    dependsOn: "Build"
+    jobs:
+    - job:
+    pool:
+    vmImage: "windows-latest"
     steps:
-    - script: |
-        dotnet publish $(Build.SourcesDirectory)/DotNet-AES-RSA.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Test
-      displayName: 'Build & Publish Test'
+    - download: current
+    artifact: drop
+    - task: AzureRmWebAppDeployment@4
+    inputs:
+    ConnectionType: 'AzureRM'
+    azureSubscription: 'Azure Connection'
+    appType: 'webApp'
+    WebAppName: 'dssdemo1-dev'
+    packageForLinux: '$(Pipeline.Workspace)/**/*.zip'
 
-    - task: CopyFiles@2
-      inputs:
-        SourceFolder: '$(Build.ArtifactStagingDirectory)/Test'
-        TargetFolder: 'C:\inetpub\wwwroot\Test'
-        OverWrite: true
-      displayName: 'Copy to Test Environment'
+ - stage: "DeployToQA"
+    dependsOn: "DeployToDev"
+    jobs:
+    - job:
+    pool:
+    vmImage: "windows-latest"
+    steps:
+    - download: current
+    artifact: drop
+    - task: AzureRmWebAppDeployment@4
+    inputs:
+    ConnectionType: 'AzureRM'
+    azureSubscription: 'Azure Connection'
+    appType: 'webApp'
+    WebAppName: 'dssdemo1-qa'
+    packageForLinux: '$(Pipeline.Workspace)/**/*.zip'
 
-- stage: Stage
-  displayName: 'Deploy to Stage'
-  dependsOn: Test
-  condition: succeeded()
-  jobs:
-  - deployment: DeployStage
-    environment: 'Stage'  # Manual approval required
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: |
-              dotnet publish $(Build.SourcesDirectory)/DotNet-AES-RSA.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Stage
-            displayName: 'Build & Publish Stage'
+ - stage: "DeployToProd"
+    dependsOn: "DeployToQA"
+    jobs:
+    - job:
+    pool:
+    vmImage: "windows-latest"
+    steps:
+    - download: current
+    artifact: drop
+    - task: AzureRmWebAppDeployment@4
+    inputs:
+    ConnectionType: 'AzureRM'
+    azureSubscription: 'Azure Connection'
+    appType: 'webApp'
+    WebAppName: 'dssdemo1-prod'
+    deployToSlotOrASE: true
+    ResourceGroupName: 'DemoRG'
+    SlotName: 'staging'
+    packageForLinux: '$(Pipeline.Workspace)/**/*.zip'
 
-          - task: CopyFiles@2
-            inputs:
-              SourceFolder: '$(Build.ArtifactStagingDirectory)/Stage'
-              TargetFolder: 'C:\inetpub\wwwroot\Stage'
-              OverWrite: true
-            displayName: 'Copy to Stage Environment'
-
-- stage: Prod
-  displayName: 'Deploy to Production'
-  dependsOn: Stage
-  condition: succeeded()
-  jobs:
-  - deployment: DeployProd
-    environment: 'Prod'  # Manual approval required
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: |
-              dotnet publish $(Build.SourcesDirectory)/DotNet-AES-RSA.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Prod
-            displayName: 'Build & Publish Prod'
-
-          - task: CopyFiles@2
-            inputs:
-              SourceFolder: '$(Build.ArtifactStagingDirectory)/Prod'
-              TargetFolder: 'C:\inetpub\wwwroot\Prod'
-              OverWrite: true
-            displayName: 'Copy to Production Environment'
+    - task: AzureAppServiceManage@0
+    inputs:
+    azureSubscription: 'Azure Connection'
+    Action: 'Swap Slots'
+    WebAppName: 'dssdemo1-prod'
+    ResourceGroupName: 'DemoRG'
+    SourceSlot: 'staging'
