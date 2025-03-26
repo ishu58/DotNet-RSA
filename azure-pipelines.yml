@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: 'Self-Hosted-Agent'  # Aapka self-hosted agent jo VM me install hai
+  name: 'Azure Pipelines'  # Aapka self-hosted agent jo VM me install hai
 
 stages:
 - stage: Test
