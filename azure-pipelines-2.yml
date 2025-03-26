@@ -1,0 +1,4 @@
+pool: 
+  name: 'Default'
+steps:
+  - script: echo "Running on $(Agent.Name) in pool $(Agent.Pool)"
