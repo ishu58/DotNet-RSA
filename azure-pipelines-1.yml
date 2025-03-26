@@ -1,0 +1,87 @@
+trigger:
+  branches:
+    include:
+      - master
+
+stages:
+  - stage: DeployTest
+    displayName: 'Deploy to Test Environment'
+    jobs:
+      - job: Deploy
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+          - task: CopyFiles@2
+            displayName: 'Copy Files to Remote Windows Machine'
+            inputs:
+              SourceFolder: '$(Build.ArtifactStagingDirectory)'
+              Contents: '**'
+              TargetFolder: '\\RemoteServer\c$\Deployment\Test'
+              CleanTargetFolder: true
+              OverWrite: true
+              AdditionalArguments: '/E /Z /Y'
+
+          - task: PowerShell@2
+            displayName: 'Restart IIS for Test'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Invoke-Command -ComputerName RemoteServer -ScriptBlock {iisreset}
+
+  - stage: DeployStage
+    displayName: 'Deploy to Stage Environment'
+    dependsOn: DeployTest
+    condition: succeeded()
+    jobs:
+      - deployment: StageApproval
+        displayName: 'Wait for Stage Approval'
+        environment: 'Stage'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: CopyFiles@2
+                  displayName: 'Copy Files to Stage'
+                  inputs:
+                    SourceFolder: '$(Build.ArtifactStagingDirectory)'
+                    Contents: '**'
+                    TargetFolder: '\\RemoteServer\c$\Deployment\Stage'
+                    CleanTargetFolder: true
+                    OverWrite: true
+                    AdditionalArguments: '/E /Z /Y'
+
+                - task: PowerShell@2
+                  displayName: 'Restart IIS for Stage'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      Invoke-Command -ComputerName RemoteServer -ScriptBlock {iisreset}
+
+  - stage: DeployProd
+    displayName: 'Deploy to Prod Environment'
+    dependsOn: DeployStage
+    condition: succeeded()
+    jobs:
+      - deployment: ProdApproval
+        displayName: 'Wait for Prod Approval'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: CopyFiles@2
+                  displayName: 'Copy Files to Prod'
+                  inputs:
+                    SourceFolder: '$(Build.ArtifactStagingDirectory)'
+                    Contents: '**'
+                    TargetFolder: '\\RemoteServer\c$\Deployment\Prod'
+                    CleanTargetFolder: true
+                    OverWrite: true
+                    AdditionalArguments: '/E /Z /Y'
+
+                - task: PowerShell@2
+                  displayName: 'Restart IIS for Prod'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      Invoke-Command -ComputerName RemoteServer -ScriptBlock {iisreset}
