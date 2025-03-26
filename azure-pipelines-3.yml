@@ -1,0 +1,105 @@
+trigger:
+- master
+
+variables:
+- group: vm-credentials
+- name: buildConfiguration
+  value: 'Release'
+- name: serviceConnection
+  value: 'myapi-azure-connection'
+
+stages:
+- stage: Build
+  displayName: Build Artifact
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '6.x'
+
+    - script: dotnet restore
+      displayName: 'Restore Packages'
+
+    - script: dotnet build --configuration $(buildConfiguration)
+      displayName: 'Build Solution'
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'publish'
+        publishWebProjects: true
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifact: 'drop'
+
+- stage: Test
+  displayName: Deploy to Test
+  dependsOn: Build
+  jobs:
+  - deployment: TestDeploy
+    environment: Test
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: WinRM-IISWebAppDeployment@1
+            inputs:
+              WebSiteName: 'MyAPI-Test'
+              Package: '$(Pipeline.Workspace)/drop/**/*.zip'
+              RemoveAdditionalFiles: true
+              AuthenticationType: 'Basic'
+              UserName: $(vmAdmin)
+              Password: $(vmAdminPassword)
+
+- stage: Stage
+  displayName: Deploy to Stage
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - deployment: StageDeploy
+    environment: Stage
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: WinRM-IISWebAppDeployment@1
+            inputs:
+              WebSiteName: 'MyAPI-Stage'
+              Package: '$(Pipeline.Workspace)/drop/**/*.zip'
+              RemoveAdditionalFiles: true
+              AuthenticationType: 'Basic'
+              UserName: $(vmAdmin)
+              Password: $(vmAdminPassword)
+
+- stage: Prod
+  displayName: Deploy to Prod
+  dependsOn: Stage
+  condition: succeeded()
+  jobs:
+  - deployment: ProdDeploy
+    environment: Prod
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: WinRM-IISWebAppDeployment@1
+            inputs:
+              WebSiteName: 'MyAPI-Prod'
+              Package: '$(Pipeline.Workspace)/drop/**/*.zip'
+              RemoveAdditionalFiles: true
+              AuthenticationType: 'Basic'
+              UserName: $(vmAdmin)
+              Password: $(vmAdminPassword)
