@@ -21,7 +21,7 @@ stages:
         packageType: 'sdk'
         version: '6.x'
 
-    - script: dotnet restore
+    - script: dotnet restore DotNet-RSA.sln
       displayName: 'Restore Packages'
 
     - script: dotnet build --configuration $(buildConfiguration)
