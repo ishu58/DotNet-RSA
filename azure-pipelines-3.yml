@@ -69,8 +69,8 @@ stages:
               targetType: 'inline'
               script: |
                 Write-Host "Testing SMB access..."
-                Test-NetConnection -ComputerName $(vmIP) -Port 445
-                if (-not (Test-Path "\\$(vmIP)\C$")) {
+                Test-NetConnection -ComputerName $(vmName) -Port 445
+                if (-not (Test-Path "\\$(vmName)\C$")) {
                   throw "SMB access failed"
                 }
 
@@ -105,8 +105,8 @@ stages:
               targetType: 'inline'
               script: |
                 Write-Host "Testing SMB access..."
-                Test-NetConnection -ComputerName $(vmIP) -Port 445
-                if (-not (Test-Path "\\$(vmIP)\C$")) {
+                Test-NetConnection -ComputerName $(vmName) -Port 445
+                if (-not (Test-Path "\\$(vmName)\C$")) {
                   throw "SMB access failed"
                 }
 
@@ -141,7 +141,7 @@ stages:
               targetType: 'inline'
               script: |
                 Write-Host "Testing SMB access..."
-                Test-NetConnection -ComputerName $(vmIP) -Port 445
-                if (-not (Test-Path "\\$(vmIP)\C$")) {
+                Test-NetConnection -ComputerName $(vmName) -Port 445
+                if (-not (Test-Path "\\$(vmName)\C$")) {
                   throw "SMB access failed"
                 }
