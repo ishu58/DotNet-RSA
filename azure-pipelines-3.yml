@@ -47,6 +47,8 @@ stages:
   jobs:
   - deployment: TestDeploy
     environment: Test
+    pool:  # ADD THIS SECTION
+      vmImage: 'windows-latest'
     strategy:
       runOnce:
         deploy:
@@ -110,6 +112,8 @@ stages:
   jobs:
   - deployment: StageDeploy
     environment: Stage
+    pool:  # ADD THIS SECTION
+      vmImage: 'windows-latest'
     strategy:
       runOnce:
         deploy:
@@ -141,6 +145,8 @@ stages:
   jobs:
   - deployment: ProdDeploy
     environment: Prod
+    pool:  # ADD THIS SECTION
+      vmImage: 'windows-latest'
     strategy:
       runOnce:
         deploy:
