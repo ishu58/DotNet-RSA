@@ -1,5 +1,5 @@
 trigger:
-- main
+- master
 
 variables:
   vmName: 'multi-stage-vm'
