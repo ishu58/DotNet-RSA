@@ -24,7 +24,7 @@ stages:
     - script: dotnet restore DotNet-RSA.sln
       displayName: 'Restore Packages'
 
-    - script: dotnet build --configuration $(buildConfiguration)
+    - script: dotnet build DotNet-RSA.sln --configuration $(buildConfiguration)
       displayName: 'Build Solution'
 
     - task: DotNetCoreCLI@2
