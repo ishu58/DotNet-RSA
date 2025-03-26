@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: 'Azure Pipelines'  # Aapka self-hosted agent jo VM me install hai
+  name: 'Azure Pipelines'  # Aapke self-hosted agent ka correct pool name
 
 stages:
 - stage: Test
@@ -13,13 +13,14 @@ stages:
   - job: DeployTest
     steps:
     - script: |
-        dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/Test
+        dotnet publish $(Build.SourcesDirectory)/MyApi/MyApi.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Test
       displayName: 'Build & Publish Test'
 
     - task: CopyFiles@2
       inputs:
         SourceFolder: '$(Build.ArtifactStagingDirectory)/Test'
         TargetFolder: 'C:\inetpub\wwwroot\Test'
+        OverWrite: true
       displayName: 'Copy to Test Environment'
 
 - stage: Stage
@@ -34,13 +35,14 @@ stages:
         deploy:
           steps:
           - script: |
-              dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/Stage
+              dotnet publish $(Build.SourcesDirectory)/MyApi/MyApi.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Stage
             displayName: 'Build & Publish Stage'
 
           - task: CopyFiles@2
             inputs:
               SourceFolder: '$(Build.ArtifactStagingDirectory)/Stage'
               TargetFolder: 'C:\inetpub\wwwroot\Stage'
+              OverWrite: true
             displayName: 'Copy to Stage Environment'
 
 - stage: Prod
@@ -55,11 +57,12 @@ stages:
         deploy:
           steps:
           - script: |
-              dotnet publish -c Release -o $(Build.ArtifactStagingDirectory)/Prod
+              dotnet publish $(Build.SourcesDirectory)/MyApi/MyApi.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Prod
             displayName: 'Build & Publish Prod'
 
           - task: CopyFiles@2
             inputs:
               SourceFolder: '$(Build.ArtifactStagingDirectory)/Prod'
               TargetFolder: 'C:\inetpub\wwwroot\Prod'
+              OverWrite: true
             displayName: 'Copy to Production Environment'
