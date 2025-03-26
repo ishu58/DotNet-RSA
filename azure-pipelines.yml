@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - main
+      - master
 
 pool:
   name: 'Azure Pipelines'  # Aapke self-hosted agent ka correct pool name
@@ -13,7 +13,7 @@ stages:
   - job: DeployTest
     steps:
     - script: |
-        dotnet publish $(Build.SourcesDirectory)/MyApi/MyApi.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Test
+        dotnet publish $(Build.SourcesDirectory)/DotNet-AES-RSA.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Test
       displayName: 'Build & Publish Test'
 
     - task: CopyFiles@2
@@ -35,7 +35,7 @@ stages:
         deploy:
           steps:
           - script: |
-              dotnet publish $(Build.SourcesDirectory)/MyApi/MyApi.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Stage
+              dotnet publish $(Build.SourcesDirectory)/DotNet-AES-RSA.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Stage
             displayName: 'Build & Publish Stage'
 
           - task: CopyFiles@2
@@ -57,7 +57,7 @@ stages:
         deploy:
           steps:
           - script: |
-              dotnet publish $(Build.SourcesDirectory)/MyApi/MyApi.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Prod
+              dotnet publish $(Build.SourcesDirectory)/DotNet-AES-RSA.csproj -c Release -o $(Build.ArtifactStagingDirectory)/Prod
             displayName: 'Build & Publish Prod'
 
           - task: CopyFiles@2
