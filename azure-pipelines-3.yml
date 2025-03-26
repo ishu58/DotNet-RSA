@@ -1,5 +1,5 @@
 trigger:
-- master
+- main
 
 variables:
 - group: vm-credentials
@@ -42,6 +42,8 @@ stages:
 - stage: Test
   displayName: Deploy to Test
   dependsOn: Build
+  variables:
+    websiteName: 'MyAPI-Test'
   jobs:
   - deployment: TestDeploy
     environment: Test
@@ -51,19 +53,60 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: WinRM-IISWebAppDeployment@1
+            
+          - task: WindowsMachineFileCopy@2
             inputs:
-              WebSiteName: 'MyAPI-Test'
-              Package: '$(Pipeline.Workspace)/drop/**/*.zip'
-              RemoveAdditionalFiles: true
-              AuthenticationType: 'Basic'
-              UserName: $(vmAdmin)
-              Password: $(vmAdminPassword)
+              SourcePath: '$(Pipeline.Workspace)/drop'
+              MachineNames: $(vmName)
+              AdminUserName: $(vmAdmin)
+              AdminPassword: $(vmAdminPassword)
+              TargetPath: 'C:\Temp\Deploy'
+              
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                $WebSiteName = "$(websiteName)"
+                $password = ConvertTo-SecureString -String "$(vmAdminPassword)" -AsPlainText -Force
+                $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList "$(vmAdmin)", $password
+
+                Invoke-Command -ComputerName "$(vmName)" -Credential $credential -ScriptBlock {
+                  param($WebSiteName)
+                  
+                  # Create/clean directory
+                  $deployPath = "C:\inetpub\$WebSiteName"
+                  if (-not (Test-Path $deployPath)) {
+                      New-Item -Path $deployPath -ItemType Directory
+                  }
+                  else {
+                      Get-ChildItem -Path $deployPath | Remove-Item -Recurse -Force
+                  }
+
+                  # Extract files
+                  Expand-Archive -Path "C:\Temp\Deploy\*.zip" -DestinationPath $deployPath -Force
+
+                  # Configure IIS
+                  if (-not (Get-Website -Name $WebSiteName -ErrorAction SilentlyContinue)) {
+                      New-Website -Name $WebSiteName -PhysicalPath $deployPath -Port 80
+                  }
+                  else {
+                      Set-ItemProperty "IIS:\Sites\$WebSiteName" -Name physicalPath -Value $deployPath
+                  }
+
+                  # Set permissions (optional)
+                  icacls $deployPath /grant "IIS AppPool\$WebSiteName:(OI)(CI)(RX)"
+
+                  # Restart website
+                  Stop-WebSite -Name $WebSiteName -ErrorAction SilentlyContinue
+                  Start-WebSite -Name $WebSiteName
+                } -ArgumentList $WebSiteName
 
 - stage: Stage
   displayName: Deploy to Stage
   dependsOn: Test
   condition: succeeded()
+  variables:
+    websiteName: 'MyAPI-Stage'
   jobs:
   - deployment: StageDeploy
     environment: Stage
@@ -73,19 +116,28 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: WinRM-IISWebAppDeployment@1
+            
+          - task: WindowsMachineFileCopy@2
             inputs:
-              WebSiteName: 'MyAPI-Stage'
-              Package: '$(Pipeline.Workspace)/drop/**/*.zip'
-              RemoveAdditionalFiles: true
-              AuthenticationType: 'Basic'
-              UserName: $(vmAdmin)
-              Password: $(vmAdminPassword)
+              SourcePath: '$(Pipeline.Workspace)/drop'
+              MachineNames: $(vmName)
+              AdminUserName: $(vmAdmin)
+              AdminPassword: $(vmAdminPassword)
+              TargetPath: 'C:\Temp\Deploy'
+              
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Same script as Test stage with different $websiteName
+                # ...
 
 - stage: Prod
   displayName: Deploy to Prod
   dependsOn: Stage
   condition: succeeded()
+  variables:
+    websiteName: 'MyAPI-Prod'
   jobs:
   - deployment: ProdDeploy
     environment: Prod
@@ -95,11 +147,18 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: WinRM-IISWebAppDeployment@1
+            
+          - task: WindowsMachineFileCopy@2
             inputs:
-              WebSiteName: 'MyAPI-Prod'
-              Package: '$(Pipeline.Workspace)/drop/**/*.zip'
-              RemoveAdditionalFiles: true
-              AuthenticationType: 'Basic'
-              UserName: $(vmAdmin)
-              Password: $(vmAdminPassword)
+              SourcePath: '$(Pipeline.Workspace)/drop'
+              MachineNames: $(vmName)
+              AdminUserName: $(vmAdmin)
+              AdminPassword: $(vmAdminPassword)
+              TargetPath: 'C:\Temp\Deploy'
+              
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Same script as Test stage with different $websiteName
+                # ...
