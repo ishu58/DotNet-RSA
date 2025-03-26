@@ -68,40 +68,11 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                $WebSiteName = "$(websiteName)"
-                $password = ConvertTo-SecureString -String "$(vmAdminPassword)" -AsPlainText -Force
-                $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList "$(vmAdmin)", $password
-
-                Invoke-Command -ComputerName "$(vmName)" -Credential $credential -ScriptBlock {
-                  param($WebSiteName)
-                  
-                  # Create/clean directory
-                  $deployPath = "C:\inetpub\$WebSiteName"
-                  if (-not (Test-Path $deployPath)) {
-                      New-Item -Path $deployPath -ItemType Directory
-                  }
-                  else {
-                      Get-ChildItem -Path $deployPath | Remove-Item -Recurse -Force
-                  }
-
-                  # Extract files
-                  Expand-Archive -Path "C:\Temp\Deploy\*.zip" -DestinationPath $deployPath -Force
-
-                  # Configure IIS
-                  if (-not (Get-Website -Name $WebSiteName -ErrorAction SilentlyContinue)) {
-                      New-Website -Name $WebSiteName -PhysicalPath $deployPath -Port 80
-                  }
-                  else {
-                      Set-ItemProperty "IIS:\Sites\$WebSiteName" -Name physicalPath -Value $deployPath
-                  }
-
-                  # Set permissions (optional)
-                  icacls $deployPath /grant "IIS AppPool\$WebSiteName:(OI)(CI)(RX)"
-
-                  # Restart website
-                  Stop-WebSite -Name $WebSiteName -ErrorAction SilentlyContinue
-                  Start-WebSite -Name $WebSiteName
-                } -ArgumentList $WebSiteName
+                Write-Host "Testing SMB access..."
+                Test-NetConnection -ComputerName $(vmIP) -Port 445
+                if (-not (Test-Path "\\$(vmIP)\C$")) {
+                  throw "SMB access failed"
+                }
 
 - stage: Stage
   displayName: Deploy to Stage
@@ -133,8 +104,11 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                # Same script as Test stage with different $websiteName
-                # ...
+                Write-Host "Testing SMB access..."
+                Test-NetConnection -ComputerName $(vmIP) -Port 445
+                if (-not (Test-Path "\\$(vmIP)\C$")) {
+                  throw "SMB access failed"
+                }
 
 - stage: Prod
   displayName: Deploy to Prod
@@ -166,5 +140,8 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                # Same script as Test stage with different $websiteName
-                # ...
+                Write-Host "Testing SMB access..."
+                Test-NetConnection -ComputerName $(vmIP) -Port 445
+                if (-not (Test-Path "\\$(vmIP)\C$")) {
+                  throw "SMB access failed"
+                }
